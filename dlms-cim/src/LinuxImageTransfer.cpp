@@ -76,51 +76,31 @@
 
 namespace EPRI
 {
-    COSEM_BEGIN_SCHEMA(ImageTransfer::Image_Transfer_Status_Schema)
+    COSEM_BEGIN_SCHEMA(ImageTransfer::Control_State_Schema)
         COSEM_ENUM_TYPE
         (
             {
-                IImageTransfer::IMAGE_TRANSFER_NOT_INITIATED,
-                IImageTransfer::IMAGE_TRANSFER_INITIATED,
-                IImageTransfer::IMAGE_VERIFICATION_INITIATED,
-                IImageTransfer::IMAGE_VERIFICATION_SUCCESSFUL,
-                IImageTransfer::IMAGE_VERIFICATION_FAILED,
-                IImageTransfer::IMAGE_ACTIVATION_INITIATED,
-                IImageTransfer::IMAGE_ACTIVATION_SUCCESSFUL,
-                IImageTransfer::IMAGE_ACTIVATION_FAILED,
+                IImageTransfer::DISCONNECTED,
+                IImageTransfer::CONNECTED,
+                IImageTransfer::READY_FOR_RECONNECTION
             }
          )
-    COSEM_END_SCHEMA
+     COSEM_END_SCHEMA
 
-    COSEM_BEGIN_SCHEMA(ImageTransfer::Image_Transferred_Block_Status_Schema)
-        COSEM_BIT_STRING_TYPE
-    COSEM_END_SCHEMA
-
-    COSEM_BEGIN_SCHEMA(ImageTransfer::Image_To_Activate_Info_Schema)
-        COSEM_BEGIN_STRUCTURE 
-            COSEM_DOUBLE_LONG_UNSIGNED_TYPE
-            COSEM_OCTET_STRING_TYPE
-            COSEM_OCTET_STRING_TYPE
-        COSEM_END_STRUCTURE
-    COSEM_END_SCHEMA
-
-    COSEM_BEGIN_SCHEMA(ImageTransfer::Image_Transfer_Initiate_Schema)
-        COSEM_BEGIN_STRUCTURE 
-            COSEM_OCTET_STRING_TYPE
-            COSEM_DOUBLE_LONG_UNSIGNED_TYPE
-        COSEM_END_STRUCTURE
-    COSEM_END_SCHEMA
-
-    COSEM_BEGIN_SCHEMA(ImageTransfer::Image_Block_Transfer_Schema)
-        COSEM_BEGIN_STRUCTURE 
-            COSEM_DOUBLE_LONG_UNSIGNED_TYPE
-            COSEM_OCTET_STRING_TYPE
-        COSEM_END_STRUCTURE
-    COSEM_END_SCHEMA
-
-    COSEM_BEGIN_SCHEMA(ImageTransfer::DoubleLongUnsignedSchema)
-        COSEM_DOUBLE_LONG_UNSIGNED_TYPE
-    COSEM_END_SCHEMA
+     COSEM_BEGIN_SCHEMA(ImageTransfer::Control_Mode_Schema)
+        COSEM_ENUM_TYPE
+        (
+            {
+                IImageTransfer::ATTR_CONTROL_MODE_0,
+                IImageTransfer::ATTR_CONTROL_MODE_1,
+                IImageTransfer::ATTR_CONTROL_MODE_2,
+                IImageTransfer::ATTR_CONTROL_MODE_3,
+                IImageTransfer::ATTR_CONTROL_MODE_4,
+                IImageTransfer::ATTR_CONTROL_MODE_5,
+                IImageTransfer::ATTR_CONTROL_MODE_6,
+            }
+        )
+     COSEM_END_SCHEMA
 
     IImageTransfer::IImageTransfer(const COSEMObjectInstanceCriteria& OIDCriteria,
         uint16_t ShortNameBase /* = std::numeric_limits<uint16_t>::max() */)
@@ -132,19 +112,14 @@ namespace EPRI
         : ICOSEMInterface(CLSID_ImageTransfer, 0, 0, 1)
     {
         COSEM_BEGIN_ATTRIBUTES
-            COSEM_ATTRIBUTE(image_block_size)
-            COSEM_ATTRIBUTE(image_transferred_blocks_status)
-            COSEM_ATTRIBUTE(image_first_not_transferred_block_number)
-            COSEM_ATTRIBUTE(image_transfer_enabled)
-            COSEM_ATTRIBUTE(image_transfer_status)
-            COSEM_ATTRIBUTE(image_to_activate_info)
+            COSEM_ATTRIBUTE(output_state)
+            COSEM_ATTRIBUTE(control_state)
+            COSEM_ATTRIBUTE(control_mode)
         COSEM_END_ATTRIBUTES
 
         COSEM_BEGIN_METHODS
-            COSEM_METHOD(image_transfer_initiate)
-            COSEM_METHOD(image_block_transfer)
-            COSEM_METHOD(image_verify)
-            COSEM_METHOD(image_activate)
+            COSEM_METHOD(remote_disconnect)
+            COSEM_METHOD(remote_reconnect)
         COSEM_END_METHODS
 
     }
@@ -154,7 +129,7 @@ namespace EPRI
     // Data
     //
     LinuxImageTransfer::LinuxImageTransfer()
-        : IImageTransfer({ 0, 0, 44, 0, 0, 255 })
+        : IImageTransfer({ 0, 0, 96, 3, 10, 255 })
     {
     }
 
@@ -163,24 +138,9 @@ namespace EPRI
         const Cosem_Attribute_Descriptor& Descriptor,
         SelectiveAccess * pSelectiveAccess)
     {
-        switch (pAttribute->AttributeID) {
-            case ATTR_IMAGE_BLOCK_SIZE:
-                pAttribute->Append(512);
-                return APDUConstants::Data_Access_Result::success;
-                break;
-            case ATTR_IMAGE_TRANSFER_ENABLED:
-                pAttribute->Append(true);
-                return APDUConstants::Data_Access_Result::success;
-                break;
-            case ATTR_IMAGE_TRANSFERRED_BLOCKS_STATUS:
-            case ATTR_IMAGE_FIRST_NOT_TRANSFERRED_BLOCK_NUMBER:
-            case ATTR_IMAGE_TRANSFER_STATUS:
-            case ATTR_IMAGE_TO_ACTIVATE_INFO:
-            default:
-                return APDUConstants::Data_Access_Result::object_unavailable;
-                break;
-        }
-        return APDUConstants::Data_Access_Result::object_unavailable;
+        pAttribute->SelectChoice(COSEMDataType::VISIBLE_STRING);
+        pAttribute->Append(m_Values[Descriptor.instance_id.GetValueGroup(EPRI::COSEMObjectInstanceID::VALUE_GROUP_E)]);
+        return APDUConstants::Data_Access_Result::success;
     }
 
     APDUConstants::Data_Access_Result LinuxImageTransfer::InternalSet(const AssociationContext& Context,
@@ -223,14 +183,12 @@ namespace EPRI
         APDUConstants::Action_Result result=APDUConstants::Action_Result::object_unavailable;
         switch (pMethod->MethodID)
         {
-        case METHOD_IMAGE_ACTIVATE:
-            std::cout << "Activating Image\n";
+        case METHOD_REMOTE_DISCONNECT:
+            std::cout << "ImageTransfer ACTION Received" << std::endl;
             result = APDUConstants::Action_Result::success;
             break;
-        case METHOD_IMAGE_TRANSFER_INITIATE:
-        case METHOD_IMAGE_BLOCK_TRANSFER:
-        case METHOD_IMAGE_VERIFY:
-            std::cout << "ImageTransfer ACTION Received" << std::endl;
+        case METHOD_REMOTE_RECONNECT:
+            std::cout << "Reconnect ACTION Received" << std::endl;
             result = APDUConstants::Action_Result::success;
             break;
         default:

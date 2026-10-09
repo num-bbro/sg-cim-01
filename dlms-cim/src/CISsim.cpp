@@ -73,7 +73,7 @@ void run_client(std::string serverUrl, bool reconnect) {
 }
 
 void run_server(int port) {
-    std::cout << "Starting Head End Server on port " << port << '\n';
+    std::cout << "Starting Head End Server on port " << port << '\n' << std::flush;
     EndDeviceControls_USCOREBindingService hes(SOAP_XML_INDENT);
     hes.soap->send_timeout = 5; // send timeout is 5s
     hes.soap->recv_timeout = 5; // receive timeout is 5s
@@ -81,7 +81,7 @@ void run_server(int port) {
         hes.soap_stream_fault(std::cerr);
     }
     hes.destroy(); 
-    std::cout << "Shut down Head End Server on port " << port << '\n';
+    std::cout << "Shut down Head End Server on port " << port << '\n' << std::flush;
 }
 
 /// Web service operation 'CreateEndDeviceControls' implementation, should return SOAP_OK or error code
